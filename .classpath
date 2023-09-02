@@ -9,5 +9,6 @@
 	<classpathentry kind="src" path="lib"/>
 	<classpathentry excluding="src/|lib/" kind="src" path=""/>
 	<classpathentry kind="lib" path="lib/commons-net-3.6.jar"/>
+	<classpathentry kind="lib" path="lib/commons-compress-1.21.jar"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>
