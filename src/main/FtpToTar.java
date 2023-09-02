@@ -8,19 +8,18 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.net.SocketException;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
+import org.apache.commons.io.IOUtils;
 import org.apache.commons.net.ftp.FTP;
 import org.apache.commons.net.ftp.FTPClient;
 
 
 public class FtpToTar {
-	static int BUFFER_SIZE=1024*1024; // 1MB Buffer Size
 	static String server = "192.168.0.14";
     static int port = 21;
     static String user = "nineking";
@@ -87,12 +86,7 @@ public class FtpToTar {
 						System.out.println("Remote File is not Exists : " + sRemoteFilePath);
 						continue;
 					}
-			        byte[] buffer = new byte[BUFFER_SIZE];
-			        int bytesRead = -1;
-			        while ((bytesRead = is.read(buffer)) != -1) {
-			        	os.write(buffer, 0, bytesRead);
-			        }
-			        
+			        IOUtils.copy(is, os);
 			        client.completePendingCommand();
 				}
 				// Archive Tar
@@ -101,11 +95,7 @@ public class FtpToTar {
 	                entry.setModTime(0);
 	                entry.setSize(file.length());
 	                taos.putArchiveEntry(entry);
-			        byte[] buffer = new byte[BUFFER_SIZE];
-			        int bytesRead = -1;
-			        while ((bytesRead = fis.read(buffer)) != -1) {
-			        	taos.write(buffer, 0, bytesRead);
-			        }
+	                IOUtils.copy(fis, taos);
 	                taos.closeArchiveEntry();
 				}
 				file.delete();
@@ -136,31 +126,23 @@ public class FtpToTar {
 				sRemoteFileName = Paths.get(sRemoteFilePath).getFileName().toString();
 
 				try(ByteArrayOutputStream baos = new ByteArrayOutputStream();
-						OutputStream os = new BufferedOutputStream(baos);
+						BufferedOutputStream bos = new BufferedOutputStream(baos);
 						InputStream is = client.retrieveFileStream(sRemoteFilePath)){
-
-					// Start : Download
+					//retrieve
 					if(is == null) {
 						System.out.println("Remote File is not Exists : " + sRemoteFilePath);
 						continue;
 					}
-			        byte[] buffer = new byte[BUFFER_SIZE];
-			        int bytesRead = -1;
-			        while ((bytesRead = is.read(buffer)) != -1) {
-			        	os.write(buffer, 0, bytesRead);
-			        }
+			        IOUtils.copy(is, bos);
 			        client.completePendingCommand();
-			        // End : Download
-
-			        // Start : Tar Archive
+			        // tar
 	                TarArchiveEntry entry = new TarArchiveEntry(sRemoteFileName);
 	                entry.setModTime(0);
 	                entry.setSize(baos.size());
 	                taos.putArchiveEntry(entry);
-	                taos.write(baos.toByteArray());
+	                baos.writeTo(taos);
 	                taos.closeArchiveEntry();
 	                baos.close();
-			        // End : Tar Archive
 				}
 				success++;
 			}
@@ -201,12 +183,7 @@ public class FtpToTar {
 	                entry.setModTime(0);
 	                entry.setSize(size);
 	                taos.putArchiveEntry(entry);
-
-			        byte[] buffer = new byte[BUFFER_SIZE];
-			        int bytesRead = -1;
-			        while ((bytesRead = is.read(buffer)) != -1) {
-			        	taos.write(buffer, 0, bytesRead);
-			        }
+			        IOUtils.copy(is, taos);
 			        client.completePendingCommand();
 	                taos.closeArchiveEntry();
 				}
