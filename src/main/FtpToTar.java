@@ -24,21 +24,39 @@ public class FtpToTar {
 	static String server = "192.168.0.14";
     static int port = 21;
     static String user = "nineking";
-    static String pass = "***";
+    static String pass = "Wjdtjrxo424!";
     static FTPClient client = new FTPClient();
 
 
-	private static void loginFTP(FTPClient ftpClient) throws SocketException, IOException {
-        ftpClient.connect(server, port);
-        ftpClient.login(user, pass);
-        ftpClient.enterLocalPassiveMode();
-        ftpClient.setFileType(FTP.BINARY_FILE_TYPE);
+	private static boolean loginFTP(FTPClient ftpClient)  {
+		boolean success = false;
+		
+		try {
+			ftpClient.connect(server, port);
+	        if(ftpClient.login(user, pass)) {
+		        ftpClient.enterLocalPassiveMode();
+		        ftpClient.setFileType(FTP.BINARY_FILE_TYPE);
+		        success = true;
+	        }
+		}catch(Exception ex) {
+			// do nothing
+		}
+        return success;
 	}
 	private static int getRemoteFileSize(String sRemoteFilePath) throws IOException {
-		int size = 0;
-		client.sendCommand("SIZE", sRemoteFilePath);
-		String[] reply = client.getReplyString().split(" ");
-		size = Integer.parseInt(reply[reply.length-1].trim());
+		int size = -1;
+		String reply="";
+		try {
+			client.sendCommand("SIZE", sRemoteFilePath);
+			reply = client.getReplyString();
+			String[] token = reply.split(" ");
+			size = Integer.parseInt(token[token.length-1].trim());
+		}catch(Exception ex){
+			// do nothing
+			ex.printStackTrace();
+			System.out.println("reply : " + reply);
+		}		
+		
 		return size;
 	}
 	private static int retrieveFileAndTar(List<String> slRemoteFiles, String sOutDir, String sTarFilePath) {
@@ -67,6 +85,7 @@ public class FtpToTar {
 					
 					if(is == null) {
 						System.out.println("Remote File is not Exists : " + sRemoteFilePath);
+						continue;
 					}
 			        byte[] buffer = new byte[BUFFER_SIZE];
 			        int bytesRead = -1;
@@ -90,6 +109,7 @@ public class FtpToTar {
 	                taos.closeArchiveEntry();
 				}
 				file.delete();
+				success++;
 			}
 			// Make Tar
 		}catch(Exception ex) {
@@ -122,7 +142,7 @@ public class FtpToTar {
 					// Start : Download
 					if(is == null) {
 						System.out.println("Remote File is not Exists : " + sRemoteFilePath);
-						break;
+						continue;
 					}
 			        byte[] buffer = new byte[BUFFER_SIZE];
 			        int bytesRead = -1;
@@ -142,6 +162,7 @@ public class FtpToTar {
 	                baos.close();
 			        // End : Tar Archive
 				}
+				success++;
 			}
 			
 		}catch(Exception ex) {
@@ -165,13 +186,16 @@ public class FtpToTar {
 			for(int i=0; i<total; i++) {
 				sRemoteFilePath = slRemoteFiles.get(i);
 				sRemoteFileName = Paths.get(sRemoteFilePath).getFileName().toString();
-				
-				int size = getRemoteFileSize(sRemoteFilePath);
 
+				int size = getRemoteFileSize(sRemoteFilePath);
+				if(size <= 0) {
+					System.out.println("Fail to get remote file info: " + sRemoteFilePath);
+					continue;
+				}
 				try(InputStream is = client.retrieveFileStream(sRemoteFilePath)){
-					if(is == null) {
+					if(is == null || size < 0) {
 						System.out.println("Remote File is not Exists : " + sRemoteFilePath);
-						break;
+						continue;
 					}
 	                TarArchiveEntry entry = new TarArchiveEntry(sRemoteFileName);
 	                entry.setModTime(0);
@@ -186,6 +210,7 @@ public class FtpToTar {
 			        client.completePendingCommand();
 	                taos.closeArchiveEntry();
 				}
+				success++;
 			}
 			
 		}catch(Exception ex) {
@@ -196,34 +221,35 @@ public class FtpToTar {
     public static void main(String[] args) {
        	String sOutDir = "D:\\work\\ftp2tar\\output\\";
        	String sTarFilePath = "D:\\work\\ftp2tar\\output\\output.tar";
+
+        // Make a list of remote files
+    	List<String> slRemoteFiles = new ArrayList<String>();
+    	for(int i=0; i < 1024; i++) {
+    		slRemoteFiles.add("/nfs_svc/data/dummy-"+String.format("%04d", i+1)+".txt");
+    	}
+    	
         try {
-        	// 1) Login FTP
-        	loginFTP(client);
-            // 2) Make a list of remote files
-        	List<String> slRemoteFiles = new ArrayList<String>();
-        	for(int i=0; i < 1024; i++) {
-        		slRemoteFiles.add("/nfs_svc/data/dummy-"+String.format("%04d", i+1)+".txt");
-        	}
-        	int ret;
-        	
-        	long stime = System.currentTimeMillis();
-        	long etime = System.currentTimeMillis();
-        	
-        	long s1, s2, s3, s4;
+           	long s1, s2, s3, s4;
         	long e1, e2, e3;
+
+        	// 1) Login FTP
+        	if(!loginFTP(client)) {
+        		System.out.println("Login fail...");
+        		return;
+        	}
         	
         	s1 = System.currentTimeMillis();
 
 	        System.out.println("retrieveFileAndTar...");
-        	ret = retrieveFileAndTar(slRemoteFiles, sOutDir, sTarFilePath);
+        	retrieveFileAndTar(slRemoteFiles, sOutDir, sTarFilePath);
         	s2 = System.currentTimeMillis();
 
 	        System.out.println("retrieveByteWithTar...");
-        	ret = retrieveByteWithTar(slRemoteFiles, sTarFilePath);
+        	retrieveByteWithTar(slRemoteFiles, sTarFilePath);
         	s3 = System.currentTimeMillis();
 
 	        System.out.println("retrieveByteWithTarDirect...");
-        	ret = retrieveByteWithTarDirect(slRemoteFiles, sTarFilePath);
+        	retrieveByteWithTarDirect(slRemoteFiles, sTarFilePath);
         	s4 = System.currentTimeMillis();
         	
         	e1 = s2 - s1;
@@ -234,9 +260,6 @@ public class FtpToTar {
         	System.out.println("ELAPSED 2 : " + e2 + " ms");
         	System.out.println("ELAPSED 3 : " + e3 + " ms");
  
-        } catch (IOException ex) {
-            System.out.println("Error: " + ex.getMessage());
-            ex.printStackTrace();
         } finally {
             try {
                 if (client.isConnected()) {
