@@ -107,9 +107,9 @@ public class FtpToTar {
 		
 		try(
 			// Make Tar file
-            FileOutputStream yfos = new FileOutputStream(new File(sTarFilePath));
-            BufferedOutputStream ybos = new BufferedOutputStream(yfos);
-            TarArchiveOutputStream taos = new TarArchiveOutputStream(ybos)){
+            FileOutputStream tfos = new FileOutputStream(new File(sTarFilePath));
+            BufferedOutputStream tbos = new BufferedOutputStream(tfos);
+            TarArchiveOutputStream taos = new TarArchiveOutputStream(tbos)){
             
 			for(int i=0; i<total; i++) {
 				sRemoteFilePath = slRemoteFiles.get(i);
