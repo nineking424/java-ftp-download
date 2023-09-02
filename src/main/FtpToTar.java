@@ -24,7 +24,7 @@ public class FtpToTar {
 	static String server = "192.168.0.14";
     static int port = 21;
     static String user = "nineking";
-    static String pass = "Wjdtjrxo424!";
+    static String pass = "***";
     static FTPClient client = new FTPClient();
 
 
