@@ -28,7 +28,7 @@ ELAPSED 3 : 12329 ms
 FTP로 파일을 모두 다운로드 받은 다음 TAR를 생성한다.
 
 ```java
-private static int retrieveFileAndTar(List<String> slRemoteFiles, String sOutDir, String sTarFilePath) {
+	private static int retrieveFileAndTar(List<String> slRemoteFiles, String sOutDir, String sTarFilePath) {
 
 		int total = slRemoteFiles.size();
 		int success = 0;
@@ -56,12 +56,7 @@ private static int retrieveFileAndTar(List<String> slRemoteFiles, String sOutDir
 						System.out.println("Remote File is not Exists : " + sRemoteFilePath);
 						continue;
 					}
-			        byte[] buffer = new byte[BUFFER_SIZE];
-			        int bytesRead = -1;
-			        while ((bytesRead = is.read(buffer)) != -1) {
-			        	os.write(buffer, 0, bytesRead);
-			        }
-			        
+			        IOUtils.copy(is, os);
 			        client.completePendingCommand();
 				}
 				// Archive Tar
@@ -70,11 +65,7 @@ private static int retrieveFileAndTar(List<String> slRemoteFiles, String sOutDir
 	                entry.setModTime(0);
 	                entry.setSize(file.length());
 	                taos.putArchiveEntry(entry);
-			        byte[] buffer = new byte[BUFFER_SIZE];
-			        int bytesRead = -1;
-			        while ((bytesRead = fis.read(buffer)) != -1) {
-			        	taos.write(buffer, 0, bytesRead);
-			        }
+	                IOUtils.copy(fis, taos);
 	                taos.closeArchiveEntry();
 				}
 				file.delete();
@@ -93,7 +84,7 @@ private static int retrieveFileAndTar(List<String> slRemoteFiles, String sOutDir
 FTP 파일을 바이트로 메모리에 읽어들인 후 TAR로 묶는다.
 
 ```java
-private static int retrieveByteWithTar(List<String> slRemoteFiles, String sTarFilePath) {
+	private static int retrieveByteWithTar(List<String> slRemoteFiles, String sTarFilePath) {
 
 		int total = slRemoteFiles.size();
 		int success = 0;
@@ -111,31 +102,23 @@ private static int retrieveByteWithTar(List<String> slRemoteFiles, String sTarFi
 				sRemoteFileName = Paths.get(sRemoteFilePath).getFileName().toString();
 
 				try(ByteArrayOutputStream baos = new ByteArrayOutputStream();
-						OutputStream os = new BufferedOutputStream(baos);
+						BufferedOutputStream bos = new BufferedOutputStream(baos);
 						InputStream is = client.retrieveFileStream(sRemoteFilePath)){
-
-					// Start : Download
+					//retrieve
 					if(is == null) {
 						System.out.println("Remote File is not Exists : " + sRemoteFilePath);
 						continue;
 					}
-			        byte[] buffer = new byte[BUFFER_SIZE];
-			        int bytesRead = -1;
-			        while ((bytesRead = is.read(buffer)) != -1) {
-			        	os.write(buffer, 0, bytesRead);
-			        }
+			        IOUtils.copy(is, bos);
 			        client.completePendingCommand();
-			        // End : Download
-
-			        // Start : Tar Archive
+			        // tar
 	                TarArchiveEntry entry = new TarArchiveEntry(sRemoteFileName);
 	                entry.setModTime(0);
 	                entry.setSize(baos.size());
 	                taos.putArchiveEntry(entry);
-	                taos.write(baos.toByteArray());
+	                baos.writeTo(taos);
 	                taos.closeArchiveEntry();
 	                baos.close();
-			        // End : Tar Archive
 				}
 				success++;
 			}
@@ -152,7 +135,7 @@ private static int retrieveByteWithTar(List<String> slRemoteFiles, String sTarFi
 FTP와 TAR IO스트림을 직접 연결하여 곧바로 TAR에 기록한다.
 
 ```java
-private static int retrieveByteWithTarDirect(List<String> slRemoteFiles, String sTarFilePath) {
+	private static int retrieveByteWithTarDirect(List<String> slRemoteFiles, String sTarFilePath) {
 
 		int total = slRemoteFiles.size();
 		int success = 0;
@@ -183,12 +166,7 @@ private static int retrieveByteWithTarDirect(List<String> slRemoteFiles, String 
 	                entry.setModTime(0);
 	                entry.setSize(size);
 	                taos.putArchiveEntry(entry);
-
-			        byte[] buffer = new byte[BUFFER_SIZE];
-			        int bytesRead = -1;
-			        while ((bytesRead = is.read(buffer)) != -1) {
-			        	taos.write(buffer, 0, bytesRead);
-			        }
+			        IOUtils.copy(is, taos);
 			        client.completePendingCommand();
 	                taos.closeArchiveEntry();
 				}
